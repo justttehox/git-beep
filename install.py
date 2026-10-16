@@ -46,6 +46,8 @@ def main():
         print(f"Error: {play_sound_script} does not exist.")
         sys.exit(1)
 
+
+
     if os.name == "nt":
         hook_content = f"""#!/bin/sh
 "{python_executable}" "{play_sound_script}" &
