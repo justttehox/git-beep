@@ -6,7 +6,8 @@ from pathlib import Path
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
-HOOK_NAME = "post-push"
+HOOK_NAME = "pre-push"
+STALE_HOOK_NAMES = ("post-push",)
 
 
 def find_git_root():
@@ -46,16 +47,21 @@ def main():
         print(f"Error: {play_sound_script} does not exist.")
         sys.exit(1)
 
-
-
-    if os.name == "nt":
-        hook_content = f"""#!/bin/sh
-"{python_executable}" "{play_sound_script}" &
+    # pre-push is the only client-side hook Git invokes for `git push`; it
+    # feeds ref info on stdin, which we must drain or Git can report a
+    # broken pipe. The sound is backgrounded so the hook returns instantly
+    # and never blocks or fails the actual push.
+    hook_content = f"""#!/bin/sh
+cat >/dev/null
+"{python_executable}" "{play_sound_script}" >/dev/null 2>&1 &
+exit 0
 """
-    else:
-        hook_content = f"""#!/bin/sh
-"{python_executable}" "{play_sound_script}" &
-"""
+
+    for stale_name in STALE_HOOK_NAMES:
+        stale_file = hooks_dir / stale_name
+        if stale_file.exists() and "play_sound.py" in stale_file.read_text(encoding="utf-8", errors="ignore"):
+            stale_file.unlink()
+            print(f"Removed stale (non-functional) hook: {stale_file}")
 
     if hook_file.exists():
         backup_file = hooks_dir / f"{HOOK_NAME}.backup"
@@ -86,7 +92,7 @@ def main():
     print()
     print("    git push")
     print()
-    print("and the sound will play after the push completes.")
+    print("and the sound will play automatically.")
 
 
 if __name__ == "__main__":
