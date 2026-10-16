@@ -1,61 +1,50 @@
-import platform
 import subprocess
 import sys
 from pathlib import Path
 
 
-BASE_DIR = Path(__file__).resolve().parent
-SOUND_FILE = BASE_DIR / "sounds" / "push.mp3"
+SOUND_FILE = Path(__file__).resolve().parent / "sounds" / "push.mp3"
+
+
 
 
 def play_sound():
-    if not SOUND_FILE.exists():
+    if not SOUND_FILE.is_file():
         print(f"Sound file not found: {SOUND_FILE}")
-        return
+        return 1
 
-    system = platform.system()
+    sound_path = str(SOUND_FILE).replace("'", "''")
+
+    script = f"""
+Add-Type -AssemblyName PresentationCore
+$player = New-Object System.Windows.Media.MediaPlayer
+$player.Volume = 1
+$player.Open([Uri]::new('{sound_path}'))
+Start-Sleep -Seconds 2
+$player.Play()
+Start-Sleep -Seconds 5
+$player.Close()
+"""
 
     try:
-        if system == "Windows":
-            import winsound
-
-            winsound.PlaySound(
-                str(SOUND_FILE),
-                winsound.SND_FILENAME | winsound.SND_ASYNC,
-            )
-
-        elif system == "Darwin":
-            subprocess.Popen(
-                ["afplay", str(SOUND_FILE)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-
-        elif system == "Linux":
-            commands = [
-                ["paplay", str(SOUND_FILE)],
-                ["aplay", str(SOUND_FILE)],
-            ]
-
-            for command in commands:
-                try:
-                    subprocess.Popen(
-                        command,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    )
-                    return
-                except FileNotFoundError:
-                    continue
-
-            print("No supported audio player found.")
-
-        else:
-            print(f"Unsupported operating system: {system}")
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                script,
+            ],
+            check=False,
+        )
+        return result.returncode
 
     except Exception as exc:
         print(f"Could not play sound: {exc}")
+        return 1
 
 
 if __name__ == "__main__":
-    play_sound()
+    sys.exit(play_sound())
